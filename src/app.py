@@ -5,7 +5,7 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
@@ -84,8 +84,41 @@ def root():
 
 
 @app.get("/activities")
-def get_activities():
-    return activities
+def get_activities(
+    category: str = Query(None, description="Filter by category"),
+    sort: str = Query(None, description="Sort by field: name, time, participants"),
+    search: str = Query(None, description="Search by name or description")
+):
+    # Convert activities to a list of dicts with name
+    activity_list = [
+        {"name": name, **details}
+        for name, details in activities.items()
+    ]
+
+    # Filter by search
+    if search:
+        search_lower = search.lower()
+        activity_list = [
+            a for a in activity_list
+            if search_lower in a["name"].lower() or search_lower in a["description"].lower()
+        ]
+
+    # Filter by category (if category field exists in future)
+    if category:
+        activity_list = [
+            a for a in activity_list
+            if a.get("category", "").lower() == category.lower()
+        ]
+
+    # Sort
+    if sort == "name":
+        activity_list.sort(key=lambda a: a["name"].lower())
+    elif sort == "participants":
+        activity_list.sort(key=lambda a: len(a["participants"]), reverse=True)
+    elif sort == "time":
+        activity_list.sort(key=lambda a: a["schedule"])  # naive sort by schedule string
+
+    return {a["name"]: {k: v for k, v in a.items() if k != "name"} for a in activity_list}
 
 
 @app.post("/activities/{activity_name}/signup")
